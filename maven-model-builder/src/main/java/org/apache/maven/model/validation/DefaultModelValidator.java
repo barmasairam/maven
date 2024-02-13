@@ -30,9 +30,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.apache.maven.api.model.Activation;
 import org.apache.maven.api.model.ActivationFile;
@@ -572,6 +574,36 @@ public class DefaultModelValidator implements ModelValidator {
                         distMgmt.getSnapshotRepository(),
                         "distributionManagement.snapshotRepository.",
                         request);
+            }
+        }
+    }
+
+    @Override
+    public void validateExternalProfiles(
+            List<org.apache.maven.model.Profile> activeExternalProfiles,
+            Model ma,
+            ModelBuildingRequest request,
+            ModelProblemCollector problems) {
+        org.apache.maven.api.model.Model m = ma.getDelegate();
+        // check for id clashes in repositories
+        for (Profile profile : activeExternalProfiles.stream()
+                .map(org.apache.maven.model.Profile::getDelegate)
+                .collect(Collectors.toList())) {
+            for (Repository repository : profile.getRepositories()) {
+                Optional<Repository> clashingPomRepository = m.getRepositories().stream()
+                        .filter(r -> r.getId().equals(repository.getId()))
+                        .findFirst();
+                if (clashingPomRepository.isPresent()) {
+                    addViolation(
+                            problems,
+                            Severity.WARNING,
+                            Version.V40, // ?
+                            "pom repository",
+                            "?",
+                            "is overwritten by the repository with same id from external profile with id "
+                                    + profile.getId(),
+                            clashingPomRepository.get());
+                }
             }
         }
     }

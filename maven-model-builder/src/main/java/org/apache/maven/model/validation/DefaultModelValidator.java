@@ -24,6 +24,7 @@ import javax.inject.Singleton;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -589,21 +590,37 @@ public class DefaultModelValidator implements ModelValidator {
         for (Profile profile : activeExternalProfiles.stream()
                 .map(org.apache.maven.model.Profile::getDelegate)
                 .collect(Collectors.toList())) {
-            for (Repository repository : profile.getRepositories()) {
-                Optional<Repository> clashingPomRepository = m.getRepositories().stream()
-                        .filter(r -> r.getId().equals(repository.getId()))
-                        .findFirst();
-                if (clashingPomRepository.isPresent()) {
-                    addViolation(
-                            problems,
-                            Severity.WARNING,
-                            Version.V40, // ?
-                            "pom repository",
-                            "?",
-                            "is overwritten by the repository with same id from external profile with id "
-                                    + profile.getId(),
-                            clashingPomRepository.get());
-                }
+            String externalRepositoriesSource = "external profile with id '" + profile.getId() + "' in settings.xml";
+            validateUniqueRepositoryIds(
+                    false, m.getRepositories(), profile.getRepositories(), externalRepositoriesSource, problems);
+            validateUniqueRepositoryIds(
+                    true,
+                    m.getPluginRepositories(),
+                    profile.getPluginRepositories(),
+                    externalRepositoriesSource,
+                    problems);
+        }
+    }
+
+    private void validateUniqueRepositoryIds(
+            boolean isPluginRepository,
+            Collection<Repository> pomRepositories,
+            Collection<Repository> externalRepositories,
+            String externalRepositoriesSource,
+            ModelProblemCollector problems) {
+        for (Repository externalRepository : externalRepositories) {
+            Optional<Repository> clashingPomRepository = pomRepositories.stream()
+                    .filter(r -> Objects.equals(r.getId(), externalRepository.getId()))
+                    .findFirst();
+            if (clashingPomRepository.isPresent()) {
+                addViolation(
+                        problems,
+                        Severity.WARNING,
+                        Version.BASE,
+                        isPluginRepository ? "pluginRepositories.repository" : "repositories.repository",
+                        clashingPomRepository.get().getId(),
+                        "is overwritten by the repository with same id from " + externalRepositoriesSource,
+                        clashingPomRepository.get());
             }
         }
     }

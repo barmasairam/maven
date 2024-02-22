@@ -171,7 +171,7 @@ under the License.
   -->
   <repositories>
     <repository>
-      <id>central</id>
+      <id>https:jfrog.orland,hitachi.vantara.com</id>
       <name>Central Repository</name>
       <url>https://repo.maven.apache.org/maven2</url>
       <snapshots>
